@@ -19,7 +19,17 @@ model Products {
   ProductName String   @db.Text
   quantity    Int
   price       Decimal? @default(0.0000) @db.Decimal(19, 4)
-  createdAt DateTime        @default(now())
+  createdAt   DateTime @default(now())
+}
+
+model Collection {
+  id          Int      @id @default(autoincrement())
+  ORNum       String   @db.Text
+  ProductCode String   @db.Text
+  ProductName String   @db.Text
+  quantity    Int
+  TotalPrice  Decimal? @default(0.0000) @db.Decimal(19, 4)
+  createdAt   DateTime @default(now())
 }
 
 model Journal {
@@ -30,5 +40,5 @@ model Journal {
   debit       Decimal? @default(0.0000) @db.Decimal(19, 4)
   credit      Decimal? @default(0.0000) @db.Decimal(19, 4)
   ProductID   String   @db.Text
-  Date_Entry DateTime        @default(now())
+  Date_Entry  DateTime @default(now())
 }
