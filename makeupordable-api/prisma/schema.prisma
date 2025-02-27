@@ -27,6 +27,7 @@ model Collection {
   ORNum       String   @db.Text
   ProductCode String   @db.Text
   ProductName String   @db.Text
+  ProductID String   @db.Text
   quantity    Int
   TotalPrice  Decimal? @default(0.0000) @db.Decimal(19, 4)
   createdAt   DateTime @default(now())

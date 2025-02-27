@@ -21,7 +21,6 @@ import {
 } from "./component/DataGridViewReact";
 import SearchIcon from "@mui/icons-material/Search";
 import CloseIcon from "@mui/icons-material/Close";
-import { height } from "@mui/system";
 
 const URL = `http://localhost:2125`;
 
@@ -183,6 +182,18 @@ function App() {
       },
     });
 
+  const { mutate: mutateORNumber, isLoading: isLoadingORNumber } = useMutation({
+    mutationKey: "generate-or",
+    mutationFn: async (variable) =>
+      await axios.post(`${URL}/generate-orno`, variable),
+    onSuccess: (response) => {
+      if (modalRef.current.getRefs().ORNumRef.current) {
+        modalRef.current.getRefs().ORNumRef.current.textContent =
+          response.data.data;
+      }
+    },
+  });
+
   const handleSaveItem = () => {
     if (codeRef.current?.value === "") {
       codeRef.current.focus();
@@ -247,14 +258,30 @@ function App() {
 
   return (
     <>
-      {(isLoadingSave ||
+      {(isLoadingORNumber ||
+        isLoadingSave ||
         isLoadingUpdate ||
         isLoadingProductList ||
         isLoadingDeleteItem ||
         isLoadingCode) && <Loading />}
       <ModalCheck
         ref={modalRef}
-        handleOnSave={() => {}}
+        handleOnORSave={(data) => {
+          mutateORNumber({})
+          wait(100).then(() => {
+            tableRef.current.setDataFormated(
+              data.map((itm) => {
+                itm.price = parseFloat(
+                  itm.price.toString().replace(/,/g, "")
+                ).toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                });
+                return itm;
+              })
+            );
+          });
+        }}
         handleOnClose={() => {}}
       />
       <div
@@ -410,6 +437,7 @@ function App() {
             }}
             onClick={() => {
               modalRef.current.showModal();
+              mutateORNumber({});
             }}
           >
             MAKE A PAYMENT
@@ -543,7 +571,8 @@ function App() {
   );
 }
 const ModalCheck = forwardRef(
-  ({ handleOnSave, handleOnClose, hasSelectedRow }, ref) => {
+  ({ handleOnSave, handleOnClose, hasSelectedRow ,handleOnORSave }, ref) => {
+    const [isUpdateRow, setIsUpdateRow] = useState(false);
     const modalRef = useRef(null);
     const isMoving = useRef(false);
     const offset = useRef({ x: 0, y: 0 });
@@ -555,7 +584,7 @@ const ModalCheck = forwardRef(
     const tableRef = useRef(null);
     const searchRef = useRef(null);
 
-    const ORNum = useRef(null);
+    const ORNumRef = useRef(null);
 
     const productCodeRef = useRef(null);
     const productNameRef = useRef(null);
@@ -569,13 +598,30 @@ const ModalCheck = forwardRef(
     const productGrandTotalRef = useRef(null);
 
     const addTransaction = () => {
-      const data = tableRef.current.getData();
+      if (productCodeRef.current.textContent === "") {
+        return alert("PRODUCT CODE IS REQUIRED!");
+      }
+
+      if (productNameRef.current.textContent === "") {
+        return alert("PRODUCT NAME IS REQUIRED!");
+      }
+
+      if (productPriceRef.current.textContent === "") {
+        return alert("PRODUCT PRICE IS REQUIRED!");
+      }
+
+      let data = tableRef.current.getData();
+
+      if (isUpdateRow) {
+        data = data.filter((itm) => itm[4] !== productId.current);
+      }
       const newData = [
         productCodeRef.current.textContent,
         productNameRef.current.textContent,
         productQuantityRef.current?.value,
         productTotalRef.current.textContent,
         productId.current,
+        productTotalQuantityStorageRef.current,
       ];
       const mutateData = [...data, newData];
       tableRef.current.setData(mutateData);
@@ -589,7 +635,34 @@ const ModalCheck = forwardRef(
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         });
+
+      if (isUpdateRow) {
+        tableRef.current.setSelectedRow(null);
+        tableRef.current.resetCheckBox();
+      }
     };
+    const resetTransaction = () => {
+      productId.current = "";
+      if (productCodeRef.current) {
+        productCodeRef.current.textContent = "";
+      }
+      if (productNameRef.current) {
+        productNameRef.current.textContent = "";
+      }
+      if (productQuantityRef.current) {
+        productQuantityRef.current.value = "1";
+      }
+
+      productTotalQuantityStorageRef.current = "";
+      productTotalQuantityRef.current.textContent = "";
+      if (productPriceRef.current) {
+        productPriceRef.current.textContent = "";
+      }
+      if (productTotalRef.current) {
+        productTotalRef.current.textContent = "";
+      }
+    };
+
     const closeDelay = () => {
       setHandleDelayClose(true);
       setTimeout(() => {
@@ -607,7 +680,10 @@ const ModalCheck = forwardRef(
     } = useUpwardTableModalSearchSafeMode({
       size: "small",
       link: `${URL}/product-list`,
-      column: productColumns,
+      column: [
+        ...productColumns,
+        { key: "totalQuantity", label: "", width: 0, hide: true },
+      ],
       getSelectedItem: async (rowItm, _, rowIdx, __) => {
         if (rowItm) {
           productId.current = rowItm[4];
@@ -621,8 +697,8 @@ const ModalCheck = forwardRef(
             productQuantityRef.current.value = "1";
           }
 
-          productTotalQuantityStorageRef.current = rowItm[2]
-          productTotalQuantityRef.current.textContent = rowItm[2]
+          productTotalQuantityStorageRef.current = rowItm[2];
+          productTotalQuantityRef.current.textContent = rowItm[2];
           if (productPriceRef.current) {
             productPriceRef.current.textContent = parseFloat(
               rowItm[3].toString().replace(/,/g, "")
@@ -640,8 +716,36 @@ const ModalCheck = forwardRef(
             });
           }
 
+          wait(100).then(()=>{
+            productQuantityRef.current?.focus()
+          })
           productCloseModal();
         }
+      },
+    });
+
+    const { mutate: mutateSave, isLoading: isLoadingSave } = useMutation({
+      mutationKey: "save-or",
+      mutationFn: async (variable) =>
+        await axios.post(`${URL}/save-orno`, variable),
+      onSuccess: (response) => {
+        if (response.data.success) {
+          resetTransaction()
+          handleOnORSave(response.data.data)
+          return Swal.fire({
+            position: "center",
+            icon: "success",
+            title: response.data.message,
+            timer: 1500,
+          });
+        }
+  
+        Swal.fire({
+          position: "center",
+          icon: "error",
+          title: response.data.message,
+          timer: 1500,
+        });
       },
     });
 
@@ -653,7 +757,9 @@ const ModalCheck = forwardRef(
         setShowModal(false);
       },
       getRefs: () => {
-        const refs = {};
+        const refs = {
+          ORNumRef,
+        };
         return refs;
       },
     }));
@@ -696,6 +802,7 @@ const ModalCheck = forwardRef(
 
     return showModal ? (
       <>
+        {isLoadingSave && <Loading />}
         <ProductUpwardTableModalSearch />
         <div
           style={{
@@ -811,7 +918,7 @@ const ModalCheck = forwardRef(
                   }}
                 >
                   <strong>OR No. :</strong>
-                  <strong ref={ORNum}></strong>
+                  <strong style={{ color: "red" }} ref={ORNumRef}></strong>
                 </div>
               </div>
               <div
@@ -860,6 +967,11 @@ const ModalCheck = forwardRef(
                       onFocus: (e) => {
                         productQuantityRef.current?.select();
                       },
+                      onKeyDown: (e) => {
+                        if (e.code === "NumpadEnter" || e.code === "Enter") {
+                          addTransaction();
+                        }
+                      },
                       onChange: (e) => {
                         let input = parseInt(e.currentTarget.value);
                         let inputTotalQuantity = parseInt(
@@ -871,11 +983,12 @@ const ModalCheck = forwardRef(
                             .replace(/,/g, "")
                         );
                         if (input > inputTotalQuantity) {
-                          e.currentTarget.value = '1'
+                          e.currentTarget.value = "1";
                           return alert("Invalid Quantity");
                         }
-                    
-                        productTotalQuantityRef.current.textContent =  inputTotalQuantity - input
+
+                        productTotalQuantityRef.current.textContent =
+                          inputTotalQuantity - input;
                         if (productTotalRef.current) {
                           productTotalRef.current.textContent = (
                             price * input
@@ -888,8 +1001,8 @@ const ModalCheck = forwardRef(
                     }}
                     inputRef={productQuantityRef}
                   />
-                  <span> ---           Total Stock:</span>
-                  <strong ref={productTotalQuantityRef}></strong>
+                  <span style={{color:"gray"}}> --- Total Stock:</span>
+                  <strong  ref={productTotalQuantityRef}></strong>
                 </div>
                 <div style={{ display: "flex", columnGap: "10px" }}>
                   <strong>PRICE :</strong>
@@ -899,31 +1012,93 @@ const ModalCheck = forwardRef(
                   <strong>TOTAL :</strong>
                   <strong ref={productTotalRef}></strong>
                 </div>
-                <button
-                  style={{
-                    background: "#4bc96c",
-                    cursor: "pointer",
-                    width: "150px",
-                  }}
-                  onClick={addTransaction}
-                >
-                  Add Transaction
-                </button>
+                <div style={{ display: "flex" , columnGap:"20px" }}>
+                  <button
+                    style={{
+                      background: "#4bc96c",
+                      cursor: "pointer",
+                      width: "150px",
+                    }}
+                    onClick={addTransaction}
+                  >
+                    {isUpdateRow ? "Save Transaction" : "Add Transaction"}
+                  </button>
+                  <button
+                    style={{
+                      background: "gray",
+                      cursor: "pointer",
+                      width: "150px",
+                    }}
+                    onClick={resetTransaction}
+                  >
+                    Reset Transaction
+                  </button>
+                </div>
               </div>
               <div style={{ width: "100%", height: "auto" }}>
                 <DataGridViewReact
                   ref={tableRef}
                   columns={productColumns}
                   height="300px"
-                  getSelectedItem={(rowItm) => {}}
+                  getSelectedItem={(rowItm) => {
+                    if (rowItm) {
+                      setIsUpdateRow(true);
+                      productId.current = rowItm[4];
+                      if (productCodeRef.current) {
+                        productCodeRef.current.textContent = rowItm[0];
+                      }
+                      if (productNameRef.current) {
+                        productNameRef.current.textContent = rowItm[1];
+                      }
+                      if (productQuantityRef.current) {
+                        productQuantityRef.current.value = rowItm[2];
+                      }
+
+                      productTotalQuantityStorageRef.current = rowItm[5];
+                      productTotalQuantityRef.current.textContent =
+                        parseInt(rowItm[5]) - parseInt(rowItm[2]);
+                      if (productPriceRef.current) {
+                        productPriceRef.current.textContent = parseFloat(
+                          rowItm[3].toString().replace(/,/g, "")
+                        ).toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        });
+                      }
+                      if (productTotalRef.current) {
+                        productTotalRef.current.textContent = parseFloat(
+                          rowItm[3].toString().replace(/,/g, "")
+                        ).toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        });
+                      }
+                    } else {
+                      setIsUpdateRow(false);
+                      resetTransaction();
+                    }
+                  }}
                   onKeyDown={(rowItm, rowIdx, e) => {
                     if (e.code === "Delete" || e.code === "Backspace") {
                       const isConfim = window.confirm(
                         `Are you sure you want to delete this row code: ${rowItm[0]}?`
                       );
                       if (isConfim) {
-                        const rowID = rowItm[4];
-                        // mutateDeleteItem({ rowID });
+                        const data = tableRef.current.getData();
+                        data.splice(rowIdx, 1);
+                        tableRef.current.setData(data);
+
+                        productGrandTotalRef.current.textContent = data
+                          .reduce((t, itm) => {
+                            t += parseFloat(
+                              itm[3].toString().replace(/,/g, "")
+                            );
+                            return t;
+                          }, 0)
+                          .toLocaleString("en-US", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          });
                         return;
                       }
                     }
@@ -950,6 +1125,9 @@ const ModalCheck = forwardRef(
                     cursor: "pointer",
                     width: "150px",
                   }}
+                  onClick={()=>{
+                    mutateSave({ORNum:ORNumRef.current.textContent,data:tableRef.current.getData()})
+                  }}
                 >
                   Save
                 </button>
@@ -958,6 +1136,9 @@ const ModalCheck = forwardRef(
                     background: "red",
                     cursor: "pointer",
                     width: "150px",
+                  }}
+                  onClick={() => {
+                    closeDelay();
                   }}
                 >
                   Cancel
