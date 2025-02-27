@@ -15,22 +15,26 @@ import axios from "axios";
 import { useMutation } from "react-query";
 import { Loading } from "./component/Loading";
 import Swal from "sweetalert2";
-import { DataGridViewReact } from "./component/DataGridViewReact";
+import {
+  DataGridViewReact,
+  useUpwardTableModalSearchSafeMode,
+} from "./component/DataGridViewReact";
 import SearchIcon from "@mui/icons-material/Search";
 import CloseIcon from "@mui/icons-material/Close";
+import { height } from "@mui/system";
 
 const URL = `http://localhost:2125`;
 
 const productColumns = [
   { key: "ProductCode", label: "Product Code", width: 100 },
-  { key: "ProductName", label: "Product Name", width: 300 },
+  { key: "ProductName", label: "Product Name", width: 500 },
   {
     key: "quantity",
     label: "Quantity",
     width: 100,
     type: "number",
   },
-  { key: "price", label: "Product Price", width: 100, type: "number" },
+  { key: "price", label: "Item Price", width: 100, type: "number" },
   { key: "id", label: "", width: 0, hide: true },
 ];
 function App() {
@@ -392,10 +396,12 @@ function App() {
           </button>
         </div>
         <br />
-        <div style={{
-          display:"flex",
-          columnGap:"10px"
-        }}>
+        <div
+          style={{
+            display: "flex",
+            columnGap: "10px",
+          }}
+        >
           <button
             style={{
               width: "200px",
@@ -418,7 +424,7 @@ function App() {
               // modalRef.current.showModal();
             }}
           >
-            GENERATE PDF  REPORT
+            GENERATE PDF REPORT
           </button>
           <button
             style={{
@@ -430,7 +436,7 @@ function App() {
               // modalRef.current.showModal();
             }}
           >
-            GENERATE EXCEL  REPORT
+            GENERATE EXCEL REPORT
           </button>
         </div>
         <br />
@@ -546,6 +552,44 @@ const ModalCheck = forwardRef(
     const [handleDelayClose, setHandleDelayClose] = useState(false);
     const [blick, setBlick] = useState(false);
 
+    const tableRef = useRef(null);
+    const searchRef = useRef(null);
+
+    const ORNum = useRef(null);
+
+    const productCodeRef = useRef(null);
+    const productNameRef = useRef(null);
+    const productQuantityRef = useRef(null);
+    const productTotalQuantityStorageRef = useRef(null);
+    const productTotalQuantityRef = useRef(null);
+    const productPriceRef = useRef(null);
+    const productId = useRef(null);
+    const productTotalRef = useRef(null);
+
+    const productGrandTotalRef = useRef(null);
+
+    const addTransaction = () => {
+      const data = tableRef.current.getData();
+      const newData = [
+        productCodeRef.current.textContent,
+        productNameRef.current.textContent,
+        productQuantityRef.current?.value,
+        productTotalRef.current.textContent,
+        productId.current,
+      ];
+      const mutateData = [...data, newData];
+      tableRef.current.setData(mutateData);
+
+      productGrandTotalRef.current.textContent = mutateData
+        .reduce((t, itm) => {
+          t += parseFloat(itm[3].toString().replace(/,/g, ""));
+          return t;
+        }, 0)
+        .toLocaleString("en-US", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+    };
     const closeDelay = () => {
       setHandleDelayClose(true);
       setTimeout(() => {
@@ -555,6 +599,51 @@ const ModalCheck = forwardRef(
       }, 100);
     };
     const closeDelayRef = useRef(closeDelay);
+
+    const {
+      UpwardTableModalSearch: ProductUpwardTableModalSearch,
+      openModal: productOpenModal,
+      closeModal: productCloseModal,
+    } = useUpwardTableModalSearchSafeMode({
+      size: "small",
+      link: `${URL}/product-list`,
+      column: productColumns,
+      getSelectedItem: async (rowItm, _, rowIdx, __) => {
+        if (rowItm) {
+          productId.current = rowItm[4];
+          if (productCodeRef.current) {
+            productCodeRef.current.textContent = rowItm[0];
+          }
+          if (productNameRef.current) {
+            productNameRef.current.textContent = rowItm[1];
+          }
+          if (productQuantityRef.current) {
+            productQuantityRef.current.value = "1";
+          }
+
+          productTotalQuantityStorageRef.current = rowItm[2]
+          productTotalQuantityRef.current.textContent = rowItm[2]
+          if (productPriceRef.current) {
+            productPriceRef.current.textContent = parseFloat(
+              rowItm[3].toString().replace(/,/g, "")
+            ).toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            });
+          }
+          if (productTotalRef.current) {
+            productTotalRef.current.textContent = parseFloat(
+              rowItm[3].toString().replace(/,/g, "")
+            ).toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            });
+          }
+
+          productCloseModal();
+        }
+      },
+    });
 
     useImperativeHandle(ref, () => ({
       showModal: () => {
@@ -607,6 +696,7 @@ const ModalCheck = forwardRef(
 
     return showModal ? (
       <>
+        <ProductUpwardTableModalSearch />
         <div
           style={{
             position: "fixed",
@@ -627,13 +717,13 @@ const ModalCheck = forwardRef(
         <div
           ref={modalRef}
           style={{
-            height: blick ? "202px" : "200px",
-            width: blick ? "60.3%" : "60%",
+            height: blick ? "602px" : "600px",
+            width: blick ? "80.3%" : "80%",
             border: "1px solid #64748b",
             position: "absolute",
             left: "50%",
             top: "50%",
-            transform: "translate(-50%, -75%)",
+            transform: "translate(-50%, -50%)",
             display: "flex",
             flexDirection: "column",
             zIndex: handleDelayClose ? -100 : 100,
@@ -684,7 +774,197 @@ const ModalCheck = forwardRef(
               padding: "5px",
               display: "flex",
             }}
-          ></div>
+          >
+            <div
+              style={{
+                width: "100%",
+              }}
+            >
+              <div style={{ display: "flex", columnGap: "50px" }}>
+                <TextInput
+                  containerStyle={{
+                    width: "50%",
+                  }}
+                  label={{
+                    title: "Search  Product:",
+                    style: {
+                      fontSize: "12px",
+                      fontWeight: "bold",
+                      width: "100px",
+                    },
+                  }}
+                  input={{
+                    type: "text",
+                    style: { width: "calc(100% - 100px) " },
+                    onKeyDown: (e) => {
+                      if (e.code === "NumpadEnter" || e.code === "Enter") {
+                        productOpenModal(e.currentTarget.value);
+                      }
+                    },
+                  }}
+                  inputRef={searchRef}
+                />
+                <div
+                  style={{
+                    display: "flex",
+                    columnGap: "10px",
+                  }}
+                >
+                  <strong>OR No. :</strong>
+                  <strong ref={ORNum}></strong>
+                </div>
+              </div>
+              <div
+                style={{
+                  fontSize: "12px",
+                  margin: "10px",
+                  display: "flex",
+                  flexDirection: "column",
+                  rowGap: "7px",
+                }}
+              >
+                <div style={{ display: "flex", columnGap: "10px" }}>
+                  <strong>PRODUCT CODE :</strong>
+                  <strong ref={productCodeRef}></strong>
+                </div>
+                <div style={{ display: "flex", columnGap: "10px" }}>
+                  <strong>PRODUCT NAME :</strong>
+                  <strong ref={productNameRef}></strong>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    columnGap: "10px",
+                  }}
+                >
+                  <TextInput
+                    containerStyle={{
+                      width: "220px",
+                    }}
+                    label={{
+                      title: "Quantity :",
+                      style: {
+                        fontSize: "12px",
+                        fontWeight: "bold",
+                        width: "120px",
+                      },
+                    }}
+                    input={{
+                      defaultValue: "1",
+                      type: "number",
+                      style: {
+                        width: "calc(100% - 120px) ",
+                        textAlign: "right",
+                      },
+                      onFocus: (e) => {
+                        productQuantityRef.current?.select();
+                      },
+                      onChange: (e) => {
+                        let input = parseInt(e.currentTarget.value);
+                        let inputTotalQuantity = parseInt(
+                          productTotalQuantityStorageRef.current
+                        );
+                        let price = parseFloat(
+                          productPriceRef.current.textContent
+                            .toString()
+                            .replace(/,/g, "")
+                        );
+                        if (input > inputTotalQuantity) {
+                          e.currentTarget.value = '1'
+                          return alert("Invalid Quantity");
+                        }
+                    
+                        productTotalQuantityRef.current.textContent =  inputTotalQuantity - input
+                        if (productTotalRef.current) {
+                          productTotalRef.current.textContent = (
+                            price * input
+                          ).toLocaleString("en-US", {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          });
+                        }
+                      },
+                    }}
+                    inputRef={productQuantityRef}
+                  />
+                  <span> ---           Total Stock:</span>
+                  <strong ref={productTotalQuantityRef}></strong>
+                </div>
+                <div style={{ display: "flex", columnGap: "10px" }}>
+                  <strong>PRICE :</strong>
+                  <strong ref={productPriceRef}></strong>
+                </div>
+                <div style={{ display: "flex", columnGap: "10px" }}>
+                  <strong>TOTAL :</strong>
+                  <strong ref={productTotalRef}></strong>
+                </div>
+                <button
+                  style={{
+                    background: "#4bc96c",
+                    cursor: "pointer",
+                    width: "150px",
+                  }}
+                  onClick={addTransaction}
+                >
+                  Add Transaction
+                </button>
+              </div>
+              <div style={{ width: "100%", height: "auto" }}>
+                <DataGridViewReact
+                  ref={tableRef}
+                  columns={productColumns}
+                  height="300px"
+                  getSelectedItem={(rowItm) => {}}
+                  onKeyDown={(rowItm, rowIdx, e) => {
+                    if (e.code === "Delete" || e.code === "Backspace") {
+                      const isConfim = window.confirm(
+                        `Are you sure you want to delete this row code: ${rowItm[0]}?`
+                      );
+                      if (isConfim) {
+                        const rowID = rowItm[4];
+                        // mutateDeleteItem({ rowID });
+                        return;
+                      }
+                    }
+                  }}
+                />
+              </div>
+              <div
+                style={{ display: "flex", columnGap: "10px", marginTop: "5px" }}
+              >
+                <strong style={{ color: "gray" }}>GRAND TOTAL :</strong>
+                <strong ref={productGrandTotalRef}></strong>
+              </div>
+              <div
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  columnGap: "10px",
+                  justifyContent: "flex-end",
+                }}
+              >
+                <button
+                  style={{
+                    background: "#4bc96c",
+                    cursor: "pointer",
+                    width: "150px",
+                  }}
+                >
+                  Save
+                </button>
+                <button
+                  style={{
+                    background: "red",
+                    cursor: "pointer",
+                    width: "150px",
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
           <style>
             {`
               .btn-check-exit-modal:hover{

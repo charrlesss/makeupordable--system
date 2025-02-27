@@ -1555,7 +1555,7 @@ export const useUpwardTableModalSearchSafeMode = ({
   size = "small",
 }) => {
   const [show, setShow] = useState(false);
-  const searchInputRef = useRef < HTMLInputElement > null;
+  const searchInputRef = useRef(null);
 
   function openModal(search = "") {
     const body = document.body;
